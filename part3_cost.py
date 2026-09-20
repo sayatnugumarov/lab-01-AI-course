@@ -26,7 +26,9 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-from prices import MODELS, PRICE_CHECKED, PRICE_SOURCE, cost_usd
+from prices import (CLAUDE_MODEL_ORDER, GEMINI_MODEL_ORDER, GEMINI_PRICE_CHECKED,
+                    GEMINI_PRICE_SOURCE, MODELS, PRICE_CHECKED, PRICE_SOURCE,
+                    cost_usd)
 from texts import LANGUAGES
 
 DEFAULT_MEASUREMENTS = Path(__file__).with_name("measurements.json")
@@ -34,8 +36,17 @@ DEFAULT_MEASUREMENTS = Path(__file__).with_name("measurements.json")
 #: Used only when Part 2 ran without --call, so no answer was ever generated.
 FALLBACK_OUTPUT_TOKENS = 300
 
-#: Order the price tables cheapest first.
-MODEL_ORDER = ("haiku-4.5", "sonnet-5", "opus-5", "fable-5.1")
+#: measurements.json's "provider" field (written by part2_measure.py as
+#: "anthropic" implicitly, or by part2_measure_gemini.py as "gemini")
+#: decides which price table and model order apply -- the two providers'
+#: model ids are disjoint keys in the same MODELS dict, but printing the
+#: wrong provider's table would silently price Gemini tokens at Claude
+#: rates or vice versa.
+PROVIDER_SETTINGS = {
+    "anthropic": (CLAUDE_MODEL_ORDER, PRICE_SOURCE, PRICE_CHECKED, "opus-5"),
+    "gemini": (GEMINI_MODEL_ORDER, GEMINI_PRICE_SOURCE, GEMINI_PRICE_CHECKED,
+               "gemini-2.5-flash"),
+}
 
 
 def load_measurements(path: Path) -> Dict[str, object]:
@@ -140,17 +151,31 @@ def main() -> int:
         help="force one answer length for all languages, instead of the measurement",
     )
     parser.add_argument(
-        "--model", default="opus-5", choices=sorted(MODELS),
-        help="which model the final summary is about (default: opus-5)",
+        "--model", default=None, choices=sorted(MODELS),
+        help="which model the final summary is about "
+             "(default: opus-5 for Claude data, gemini-2.5-flash for Gemini data)",
     )
     args = parser.parse_args()
 
     data = load_measurements(args.measurements)
+    provider = data.get("provider", "anthropic")
+    if provider not in PROVIDER_SETTINGS:
+        sys.exit(f"unknown provider {provider!r} in {args.measurements.name}")
+    MODEL_ORDER, price_source, price_checked, default_model = PROVIDER_SETTINGS[provider]
+    model = args.model or default_model
+    if model not in MODEL_ORDER:
+        sys.exit(
+            f"--model {model} is not a {provider} model -- "
+            f"choose one of: {', '.join(MODEL_ORDER)}"
+        )
+    args.model = model
+
     outputs, provenance = resolve_output_tokens(data.get("one_request_billed"),
                                                 args.output_tokens)
 
-    print(f"prices from {PRICE_SOURCE}")
-    print(f"checked {PRICE_CHECKED}; tokens counted on {data['model_id']}")
+    print(f"provider: {provider}")
+    print(f"prices from {price_source}")
+    print(f"checked {price_checked}; tokens counted on {data['model_id']}")
     print(f"answer length: {provenance}\n")
 
     inputs = {lang: request_input_tokens(data, lang) for lang in LANGUAGES}

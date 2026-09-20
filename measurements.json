@@ -1,0 +1,41 @@
+{
+  "provider": "gemini",
+  "model": "gemini-3.6-flash",
+  "model_id": "gemini-3.6-flash",
+  "token_counts": {
+    "sentence": {
+      "en": 13,
+      "ru": 18,
+      "kk": 31
+    },
+    "complaint": {
+      "en": 60,
+      "ru": 79,
+      "kk": 149
+    },
+    "system_prompt": {
+      "en": 41,
+      "ru": 52,
+      "kk": 88
+    }
+  },
+  "request_tokens": {
+    "en": 101,
+    "ru": 131,
+    "kk": 237
+  },
+  "one_request_billed": {
+    "en": {
+      "input_tokens": 101,
+      "output_tokens": 494
+    },
+    "ru": {
+      "input_tokens": 131,
+      "output_tokens": 743
+    },
+    "kk": {
+      "input_tokens": 237,
+      "output_tokens": 883
+    }
+  }
+}
